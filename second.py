@@ -10,6 +10,7 @@ import random
 import cv2
 from tkinter import messagebox
 from PIL import Image, ImageTk
+import mysql.connector
 import threading  # Import the threading module
 
 customtkinter.set_appearance_mode("dark")
@@ -17,7 +18,7 @@ customtkinter.set_default_color_theme("blue")
 
 app = customtkinter.CTk()
 app.title("Crack Detection App")
-app.geometry("800x600")
+app.geometry("800x700")
 app.columnconfigure(0, weight=1)
 app.configure(bg="dark")  # Set background color to black
 
@@ -32,61 +33,6 @@ notebook.grid(padx=10, pady=10)
 notebook._segmented_button.grid(sticky="W")
 
 notebook.set("Detection")
-
-# History Tab
-my_tree = ttk.Treeview(notebook.tab("History"))
-my_tree['columns'] = ("Image","Date and Time","ID","Geo Location")
-my_tree.column("#0", width=120, minwidth=25)
-my_tree.column("Image", anchor=W, width=120)
-my_tree.column("Date and Time", anchor=W, width=120)
-my_tree.column("ID", anchor=CENTER, width=80)
-
-
-my_tree.heading("#0", text="Label", anchor=W)
-my_tree.heading("Image", text="Image", anchor=W)
-my_tree.heading("Date and Time", text="Date and Time", anchor=W)
-my_tree.heading("ID", text="ID", anchor=CENTER)
-
-
-e = datetime.datetime.now()
-n = random.randint(0,10000)
-my_tree.insert(parent='', index='end', iid=0, text=" ", values=("Image"," %s/%s/%s %s:%s:%s" % (e.day, e.month, e.year,e.hour, e.minute, e.second), n))
-
-my_tree.pack(pady=20)
-
-send_button = customtkinter.CTkButton(notebook.tab("History"), text="Submit")
-send_button.place(relx=0.5, rely=0.9, anchor = tk.CENTER)
-
-# Send Email Tab
-destination = StringVar(notebook.tab("Send a Message"))
-subject=StringVar(notebook.tab("Send a Message"))
-
-destination_entry = customtkinter.CTkEntry(notebook.tab("Send a Message"), placeholder_text="Email Address", width=600, height=30, border_width=2, corner_radius=10,textvariable=destination)
-destination_entry.place(relx=0.5, rely=0.1, anchor = tk.CENTER)
-
-subject_entry = customtkinter.CTkEntry(notebook.tab("Send a Message"), placeholder_text="Subject", width=600, height=30, border_width=2, corner_radius=10, textvariable=subject)
-subject_entry.place(relx=0.5, rely=0.2, anchor = tk.CENTER)
-
-textbox = customtkinter.CTkTextbox(notebook.tab("Send a Message"),width=600, height=200, border_width=2,corner_radius=10)
-textbox.place(relx=0.5, rely=0.57, anchor = tk.CENTER)
-
-def send_email():
-    receiver = "Auspineda55@gmail.com"
-    #Email Structure
-    email = EmailMessage()
-    email["From"] = receiver
-    email["To"] = destination.get()
-    email["Subject"] = subject.get()
-    email.set_content(str(textbox.get(1.0, 'end')))
-    #Send Email
-    smtp = smtplib.SMTP_SSL("smtp.gmail.com")
-    smtp.login(receiver, "gwmckyegivpmiyyg")
-    smtp.sendmail(receiver, destination.get(), email.as_string())
-    messagebox.showinfo("Message","Message Sent Successfully ")
-    smtp.quit()
-
-send_button = customtkinter.CTkButton(notebook.tab("Send a Message"), text="Send a Message", corner_radius=10,command=send_email)
-send_button.place(relx=0.5, rely=0.94, anchor = tk.CENTER)
 
 # Camera Module
 label_camera = Label(notebook.tab("Detection"), bg="gray")  # Set background color of label to gray
@@ -140,5 +86,100 @@ def show_frame():
 
 camera_button = customtkinter.CTkButton(notebook.tab("Detection"), text="Start Camera", corner_radius=10, command=toggle_camera)
 camera_button.pack(pady=20)
+
+# History Tab
+
+def update(rows):
+    my_tree.delete(*my_tree.get_children())
+    for i in rows:
+        my_tree.insert('', 'end', values=i, tags="unchecked")
+
+def getrow(event):
+    rowid = my_tree.identify_row(event.y)
+    item = my_tree.item(my_tree.focus())
+    t1.set(item['values'][0])
+    t2.set(item['values'][1])
+    t3.set(item['values'][2])
+    t4.set(item['values'][3])
+
+def toggleCheck(event):
+    rowid = my_tree.identify_row(event.y)
+    tag = my_tree.item(rowid, "tags")[0]
+    tags = list(my_tree.item(rowid, "tags"))
+    tags.remove(tag)
+    my_tree.item(rowid, tags=tags)
+    if tag == "checked":
+        my_tree.item(rowid, tags="unchecked")
+    else:
+        my_tree.item(rowid, tags="checked")
+
+mydb = mysql.connector.connect(host="localhost", user="root", passwd="hunter2513", database="projectdesign2", auth_plugin="mysql_native_password")
+cursor = mydb.cursor()
+
+t1 = StringVar()
+t2 = StringVar()
+t3 = StringVar()
+t4 = StringVar()
+
+im_checked = ImageTk.PhotoImage(Image.open("images/checked.png"))
+im_unchecked = ImageTk.PhotoImage(Image.open("images/unchecked.png"))
+
+my_tree = ttk.Treeview(notebook.tab("History"), column=(1,2,3,4))
+style = ttk.Style(my_tree)
+style.configure('Treeview', rowheight=30)
+
+my_tree.tag_configure('checked', image=im_checked)
+my_tree.tag_configure('unchecked', image=im_unchecked)
+
+my_tree.pack()
+
+my_tree.heading("#0", text="")
+my_tree.heading("#1", text="ID")
+my_tree.heading("#2", text="Label")
+my_tree.heading("#3", text="Image")
+my_tree.heading("#4", text="Date and Time")
+
+my_tree.bind('<Double 1>', getrow)
+my_tree.bind('<Button 1>', toggleCheck)
+
+query = "SELECT id, label, image, date from captured"
+cursor.execute(query)
+rows = cursor.fetchall()
+update(rows)
+
+
+send_button = customtkinter.CTkButton(notebook.tab("History"), text="Submit")
+send_button.place(relx=0.5, rely=0.9, anchor = tk.CENTER)
+
+# Send Email Tab
+destination = StringVar(notebook.tab("Send a Message"))
+subject=StringVar(notebook.tab("Send a Message"))
+
+destination_entry = customtkinter.CTkEntry(notebook.tab("Send a Message"), placeholder_text="Email Address", width=600, height=30, border_width=2, corner_radius=10,textvariable=destination)
+destination_entry.place(relx=0.5, rely=0.1, anchor = tk.CENTER)
+
+subject_entry = customtkinter.CTkEntry(notebook.tab("Send a Message"), placeholder_text="Subject", width=600, height=30, border_width=2, corner_radius=10, textvariable=subject)
+subject_entry.place(relx=0.5, rely=0.2, anchor = tk.CENTER)
+
+textbox = customtkinter.CTkTextbox(notebook.tab("Send a Message"),width=600, height=200, border_width=2,corner_radius=10)
+textbox.place(relx=0.5, rely=0.57, anchor = tk.CENTER)
+
+def send_email():
+    receiver = "Auspineda55@gmail.com"
+    #Email Structure
+    email = EmailMessage()
+    email["From"] = receiver
+    email["To"] = destination.get()
+    email["Subject"] = subject.get()
+    email.set_content(str(textbox.get(1.0, 'end')))
+    #Send Email
+    smtp = smtplib.SMTP_SSL("smtp.gmail.com")
+    smtp.login(receiver, "gwmckyegivpmiyyg")
+    smtp.sendmail(receiver, destination.get(), email.as_string())
+    messagebox.showinfo("Message","Message Sent Successfully ")
+    smtp.quit()
+
+send_button = customtkinter.CTkButton(notebook.tab("Send a Message"), text="Send a Message", corner_radius=10,command=send_email)
+send_button.place(relx=0.5, rely=0.94, anchor = tk.CENTER)
 
 app.mainloop()
